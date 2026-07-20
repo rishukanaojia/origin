@@ -1,0 +1,23 @@
+# One-click deploy of the RemoteLink shared signaling server to Render.com (free).
+#
+# HOW:
+#   1. Push this repo to GitHub.
+#   2. On https://render.com  ->  New  ->  Blueprint  ->  pick your repo.
+#   3. Render reads this file and deploys. You get a URL like
+#         https://remotelink-signaling.onrender.com
+#   4. In BOTH apps' login screen, put that URL in the "Server" field.
+#
+# The server carries NO video/input (those stay peer-to-peer) — it just pairs
+# devices, so the free tier is plenty. It provides HTTPS automatically, which
+# is also what the browser needs for screen capture.
+services:
+  - type: web
+    name: remotelink-signaling
+    runtime: node
+    plan: free
+    rootDir: signaling-server
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_VERSION
+        value: "20"

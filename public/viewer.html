@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RemoteLink — Viewer</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg0:#070b12; --bg1:#0e1826; --card:rgba(20,30,44,.72); --stroke:rgba(120,150,190,.16);
+    --ink:#eef4fb; --muted:#93a6bd; --accent:#3ba9ff; --accent2:#5ee0c0;
+    --ok:#4ecb84; --warn:#e6b153; --err:#ff6b6b; --radius:16px;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; min-height:100vh; color:var(--ink);
+    font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif; line-height:1.55;
+    background:
+      radial-gradient(1100px 560px at 90% -10%, rgba(59,169,255,.16), transparent 60%),
+      radial-gradient(800px 460px at -10% 110%, rgba(94,224,192,.12), transparent 55%),
+      linear-gradient(160deg, var(--bg0), var(--bg1));
+    background-attachment:fixed;
+  }
+  header { padding:22px 24px 6px; max-width:1200px; margin:0 auto; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .logo { width:42px; height:42px; border-radius:12px; display:grid; place-items:center; font-size:21px;
+          background:linear-gradient(135deg,var(--accent),var(--accent2)); box-shadow:0 8px 24px -6px rgba(59,169,255,.6); }
+  header h1 { margin:0; font-size:19px; letter-spacing:-.02em; }
+  header p { margin:2px 0 0; color:var(--muted); font-size:13px; }
+  .acct { margin-left:auto; font-size:12.5px; color:var(--muted); display:flex; align-items:center; gap:10px; }
+  .acct a { color:var(--accent2); text-decoration:none; }
+  main { max-width:1200px; margin:0 auto; padding:14px 24px 40px; }
+  .bar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:16px;
+         background:var(--card); border:1px solid var(--stroke); border-radius:var(--radius); padding:14px 16px;
+         backdrop-filter:blur(14px); box-shadow:0 18px 50px -20px rgba(0,0,0,.7); }
+  input { font-family:'JetBrains Mono',ui-monospace,monospace; font-size:18px; letter-spacing:.1em;
+          padding:11px 14px; border-radius:11px; border:1px solid var(--stroke);
+          background:rgba(6,11,18,.75); color:var(--accent2); outline:none; transition:border-color .15s, box-shadow .15s; }
+  input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(59,169,255,.2); }
+  #sid { width:180px; } #access { width:130px; letter-spacing:.06em; color:var(--ink); }
+  button { font-size:14px; font-weight:650; padding:11px 16px; border-radius:11px; border:none; cursor:pointer;
+           color:#04121e; background:linear-gradient(135deg,var(--accent),var(--accent2));
+           box-shadow:0 10px 22px -12px rgba(59,169,255,.8); transition:transform .12s, filter .12s, opacity .12s; }
+  button:hover:not(:disabled){ transform:translateY(-1px); filter:brightness(1.06); }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  button.ghost { background:transparent; color:var(--ink); border:1px solid var(--stroke); box-shadow:none; }
+  .status { display:inline-flex; align-items:center; gap:8px; font-size:13.5px; color:var(--muted); }
+  .dot { width:10px; height:10px; border-radius:50%; background:#65788c; }
+  .dot.wait { background:var(--warn); animation:pulse 1.6s infinite; }
+  .dot.live { background:var(--ok); animation:pulse 1.6s infinite; }
+  .dot.err { background:var(--err); }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 currentColor;opacity:1} 70%{box-shadow:0 0 0 7px transparent;opacity:.7} 100%{opacity:1} }
+  .screen { position:relative; border-radius:var(--radius); overflow:hidden; background:#000;
+            border:1px solid var(--stroke); box-shadow:0 30px 70px -30px rgba(0,0,0,.8); }
+  video { display:block; width:100%; cursor:crosshair; outline:none; }
+  .screen:fullscreen { border:none; border-radius:0; }
+  .screen:fullscreen video { width:100%; height:100%; object-fit:contain; }
+  #kb { position:absolute; bottom:0; left:0; width:1px; height:1px; opacity:0; border:none; padding:0; font-size:16px; }
+  #fsKb { display:none; position:absolute; top:14px; right:14px; z-index:2; opacity:.8;
+          font-size:18px; padding:9px 13px; background:rgba(10,18,28,.8); color:var(--ink); border:1px solid var(--stroke); }
+  .screen:fullscreen #fsKb { display:block; }
+  .overlay { position:absolute; inset:0; display:grid; place-items:center; color:#9fb2c4;
+             font-size:15px; text-align:center; padding:24px; background:radial-gradient(circle at center, rgba(20,30,44,.4), rgba(7,11,18,.85)); }
+  .hint { font-size:12.5px; color:var(--muted); margin-top:14px; }
+  kbd { font-family:ui-monospace,monospace; background:rgba(255,255,255,.06); border:1px solid var(--stroke);
+        border-radius:6px; padding:1px 7px; font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">🎮</div>
+  <div>
+    <h1>RemoteLink · Viewer</h1>
+    <p>See and control a remote screen from anywhere.</p>
+  </div>
+  <div class="acct"><span id="who"></span><a id="logout" href="#">Sign out</a></div>
+</header>
+<main>
+  <div class="bar">
+    <input id="sid" placeholder="000 000 000" maxlength="11" autocomplete="off">
+    <input id="access" placeholder="Access password" autocomplete="off">
+    <button id="connectBtn">Connect</button>
+    <button id="kbBtn" class="ghost" disabled title="Open on-screen keyboard">⌨ Keyboard</button>
+    <button id="fsBtn" class="ghost" disabled title="View full screen">⛶ Full screen</button>
+    <span class="status" style="margin-left:auto;"><span id="dot" class="dot"></span><span id="statusText">Idle</span></span>
+  </div>
+
+  <div class="screen" id="screenBox">
+    <video id="remote" playsinline autoplay tabindex="0"></video>
+    <div class="overlay" id="overlay">Enter the Session ID and access password, then Connect</div>
+    <button id="fsKb" title="Open on-screen keyboard">⌨</button>
+    <input id="kb" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
+  </div>
+  <p class="hint">
+    Tap/click the video to control the mouse. On a tablet, tap <kbd>⌨ Keyboard</kbd> to type;
+    with a physical keyboard just type while the video is focused. <kbd>⛶ Full screen</kbd> for an
+    immersive view. If your network drops, it reconnects to the same session automatically.
+  </p>
+</main>
+
+<script src="config.js"></script>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const sidInput = $('sid'), accessInput = $('access'), connectBtn = $('connectBtn'), remote = $('remote');
+  const overlay = $('overlay'), dot = $('dot'), statusText = $('statusText');
+  const kbBtn = $('kbBtn'), fsBtn = $('fsBtn'), kb = $('kb'), screenBox = $('screenBox');
+
+  function setStatus(cls, text) { dot.className = 'dot ' + cls; statusText.textContent = text; }
+  function showOverlay(text) { overlay.style.display = 'grid'; overlay.textContent = text; }
+
+  const ERR = {
+    'no-such-session': 'No such session — is the host sharing? Check the Session ID.',
+    'access-required': 'This session needs an access password.',
+    'wrong-access-password': 'Wrong access password.',
+    'session-busy': 'Someone else is connected to this session.',
+    'replaced': 'Disconnected — you connected from another device/tab.'
+  };
+
+  // ---- Account gate ----------------------------------------------------------
+  const token = localStorage.getItem('rl_token');
+  function toLogin() {
+    location.href = 'login.html?next=' + encodeURIComponent(location.pathname + location.search);
+  }
+  if (!token) { toLogin(); return; }
+  $('who').textContent = localStorage.getItem('rl_email') || '';
+  $('logout').onclick = (e) => {
+    e.preventDefault();
+    localStorage.removeItem('rl_token'); localStorage.removeItem('rl_email');
+    toLogin();
+  };
+  const inviteSid = new URLSearchParams(location.search).get('sid');
+  if (inviteSid) sidInput.value = inviteSid.replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3');
+
+  let ws, pc, controlChannel;
+  let wantConnected = false;   // true between a successful join and a deliberate stop
+  let retryTimer = null;
+  let curId = '', curAccess = '';
+
+  function doConnect(isRetry) {
+    const id = (curId || sidInput.value).trim();
+    if (!id) return;
+    curId = id; curAccess = (curAccess || accessInput.value).trim();
+    connectBtn.disabled = true; sidInput.disabled = true; accessInput.disabled = true;
+    setStatus('wait', isRetry ? 'Reconnecting…' : 'Connecting…');
+    showOverlay(isRetry ? 'Reconnecting to ' + id + '…' : 'Connecting to ' + id + '…');
+
+    ws = new WebSocket(window.SIGNAL_URL);
+    ws.onopen = () => ws.send(JSON.stringify({ type: 'join', id, token, access: curAccess }));
+    ws.onmessage = async (ev) => {
+      const msg = JSON.parse(ev.data);
+      switch (msg.type) {
+        case 'joined':
+          wantConnected = true;
+          showOverlay('Joined — waiting for host stream…');
+          break;
+        case 'offer':
+          await handleOffer(msg.sdp);
+          break;
+        case 'candidate':
+          if (msg.candidate && pc) { try { await pc.addIceCandidate(msg.candidate); } catch (e) {} }
+          break;
+        case 'peer-left':
+          // Host stopped sharing — nothing to reconnect to.
+          wantConnected = false;
+          teardownPeer();
+          setStatus('err', 'Host stopped sharing');
+          showOverlay('Host stopped sharing');
+          resetControls();
+          break;
+        case 'error':
+          if (msg.reason === 'auth-required') { toLogin(); return; }
+          wantConnected = false;
+          setStatus('err', ERR[msg.reason] || msg.reason);
+          showOverlay(ERR[msg.reason] || ('Error: ' + msg.reason));
+          resetControls();
+          // A wrong/missing password should let the user try again with a new value.
+          if (msg.reason === 'wrong-access-password' || msg.reason === 'access-required') {
+            curAccess = ''; accessInput.focus();
+          }
+          break;
+      }
+    };
+    // If the socket drops unexpectedly while we still want to be connected
+    // (viewer's own network blip), auto-rejoin the SAME session/link.
+    ws.onclose = () => {
+      if (wantConnected) {
+        setStatus('wait', 'Connection lost — reconnecting…');
+        showOverlay('Connection lost — reconnecting…');
+        clearTimeout(retryTimer);
+        retryTimer = setTimeout(() => doConnect(true), 2000);
+      }
+    };
+  }
+
+  connectBtn.onclick = () => { curId = ''; curAccess = ''; doConnect(false); };
+
+  function resetControls() {
+    connectBtn.disabled = false; sidInput.disabled = false; accessInput.disabled = false;
+    kbBtn.disabled = true; fsBtn.disabled = true;
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  }
+  function teardownPeer() {
+    if (pc) { try { pc.close(); } catch (e) {} pc = null; }
+    remote.srcObject = null;
+  }
+
+  async function handleOffer(sdp) {
+    teardownPeer();
+    pc = new RTCPeerConnection(window.RTC_CONFIG);
+
+    pc.ontrack = (e) => {
+      remote.srcObject = e.streams[0];
+      overlay.style.display = 'none';
+      if ('playoutDelayHint' in e.receiver) e.receiver.playoutDelayHint = 0;
+      if ('jitterBufferTarget' in e.receiver) e.receiver.jitterBufferTarget = 0;
+    };
+    pc.ondatachannel = (e) => {
+      controlChannel = e.channel;
+      controlChannel.onopen = () => setStatus('live', 'Connected — you have control');
+      controlChannel.onmessage = (m) => {
+        try { const d = JSON.parse(m.data); if (d.t === 'screen') { hostW = d.w; hostH = d.h; } } catch (err) {}
+      };
+      wireInput();
+    };
+    pc.onicecandidate = (e) => {
+      if (e.candidate) ws.send(JSON.stringify({ type: 'candidate', candidate: e.candidate }));
+    };
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'connected') setStatus('live', 'Connected');
+      else if (pc.connectionState === 'failed') setStatus('err', 'Connection failed (needs TURN?)');
+    };
+
+    await pc.setRemoteDescription(sdp);
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    ws.send(JSON.stringify({ type: 'answer', sdp: pc.localDescription }));
+  }
+
+  function send(ev) {
+    if (controlChannel && controlChannel.readyState === 'open') controlChannel.send(JSON.stringify(ev));
+  }
+
+  // Map a click to the HOST's screen pixels: handles letterboxing and any
+  // encoder downscaling (uses the host's announced size hostW/hostH).
+  let hostW = 0, hostH = 0;
+  function toHostCoords(e) {
+    const r = remote.getBoundingClientRect();
+    const vw = remote.videoWidth || r.width, vh = remote.videoHeight || r.height;
+    const scale = Math.min(r.width / vw, r.height / vh);
+    const dispW = vw * scale, dispH = vh * scale;
+    const offX = (r.width - dispW) / 2, offY = (r.height - dispH) / 2;
+    let fx = (e.clientX - r.left - offX) / dispW;
+    let fy = (e.clientY - r.top - offY) / dispH;
+    fx = Math.min(1, Math.max(0, fx));
+    fy = Math.min(1, Math.max(0, fy));
+    return { x: Math.round(fx * (hostW || vw)), y: Math.round(fy * (hostH || vh)) };
+  }
+
+  function tapKey(k) { send({ t: 'key', k, down: true }); send({ t: 'key', k, down: false }); }
+
+  function wireInput() {
+    let lastMove = 0, moveTimer = null;
+    remote.addEventListener('mousemove', (e) => {
+      const p = toHostCoords(e);
+      const now = Date.now();
+      if (now - lastMove >= 33) { lastMove = now; send({ t: 'move', x: p.x, y: p.y }); }
+      else { clearTimeout(moveTimer); moveTimer = setTimeout(() => { lastMove = Date.now(); send({ t: 'move', x: p.x, y: p.y }); }, 33); }
+    });
+    remote.addEventListener('mousedown', (e) => { const p = toHostCoords(e); send({ t: 'down', b: e.button, x: p.x, y: p.y }); e.preventDefault(); });
+    remote.addEventListener('mouseup',   (e) => { send({ t: 'up', b: e.button }); e.preventDefault(); });
+    remote.addEventListener('contextmenu', (e) => e.preventDefault());
+    remote.addEventListener('wheel', (e) => { send({ t: 'wheel', dy: Math.sign(e.deltaY) }); e.preventDefault(); }, { passive: false });
+    remote.addEventListener('keydown', (e) => { pressed.add(e.key); send({ t: 'key', k: e.key, down: true }); e.preventDefault(); });
+    remote.addEventListener('keyup',   (e) => { pressed.delete(e.key); send({ t: 'key', k: e.key, down: false }); e.preventDefault(); });
+    remote.focus();
+    kbBtn.disabled = false; fsBtn.disabled = false;
+  }
+
+  // Release everything we think is held whenever focus leaves, so a missed
+  // key-up never leaves a modifier stuck on the host.
+  const pressed = new Set();
+  function releaseAllKeys() { for (const k of pressed) send({ t: 'key', k, down: false }); pressed.clear(); }
+  window.addEventListener('blur', releaseAllKeys);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAllKeys(); });
+
+  // ---- On-screen keyboard bridge (tablets/phones) ---------------------------
+  const SENTINEL = ' ';
+  kb.value = SENTINEL;
+  kbBtn.onclick = $('fsKb').onclick = () => { kb.value = SENTINEL; kb.focus(); };
+  kb.addEventListener('input', () => {
+    const v = kb.value;
+    if (v.length < SENTINEL.length) tapKey('Backspace');
+    else for (const ch of v.slice(SENTINEL.length)) { if (ch === '\n') tapKey('Enter'); else tapKey(ch); }
+    kb.value = SENTINEL;
+  });
+  kb.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === 'Backspace' || e.key === 'Tab' || e.key.startsWith('Arrow') || e.key === 'Escape') {
+      tapKey(e.key); e.preventDefault();
+    }
+  });
+
+  // ---- Fullscreen ------------------------------------------------------------
+  fsBtn.onclick = () => {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else screenBox.requestFullscreen().catch(() => {});
+  };
+  document.addEventListener('fullscreenchange', () => {
+    const fs = !!document.fullscreenElement;
+    fsBtn.textContent = fs ? '⛶ Exit full screen' : '⛶ Full screen';
+    if (fs) {
+      remote.focus();
+      if (navigator.keyboard && navigator.keyboard.lock) navigator.keyboard.lock().catch(() => {});
+    } else {
+      if (navigator.keyboard && navigator.keyboard.unlock) navigator.keyboard.unlock();
+      releaseAllKeys();
+    }
+  });
+})();
+</script>
+</body>
+</html>

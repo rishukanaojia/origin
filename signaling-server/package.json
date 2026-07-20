@@ -1,0 +1,16 @@
+{
+  "name": "remotelink-signaling",
+  "version": "1.0.0",
+  "description": "Rendezvous + signaling server for the RemoteLink remote desktop prototype.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@nut-tree-fork/nut-js": "^4.2.6",
+    "ws": "^7.5.9"
+  },
+  "optionalDependencies": {
+    "nodemailer": "^6.10.1"
+  }
+}

@@ -1,0 +1,25 @@
+# Keep the repo lean — Render only needs signaling-server/ + public/.
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+build/
+**/build/
+android-app/android/
+*.AppImage
+*.apk
+*.deb
+*.exe
+linux-unpacked/
+win-unpacked/
+mac/
+
+# Secrets / runtime state (never commit)
+signaling-server/smtp.env
+signaling-server/seed-users.js
+signaling-server/peers.json
+signaling-server/tokens.json
+
+# Local toolchain binaries
+cloudflared
+ngrok

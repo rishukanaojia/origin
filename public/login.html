@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RemoteLink — Sign in</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg0:#070b12; --bg1:#0e1826; --card:rgba(20,30,44,.78); --stroke:rgba(120,150,190,.18);
+    --ink:#eef4fb; --muted:#93a6bd; --accent:#3ba9ff; --accent2:#5ee0c0; --err:#ff6b6b; --ok:#4ecb84;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; min-height:100vh; color:var(--ink);
+    font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif; line-height:1.55;
+    display:grid; place-items:center; padding:24px;
+    background:
+      radial-gradient(1000px 520px at 80% -10%, rgba(59,169,255,.20), transparent 60%),
+      radial-gradient(800px 460px at -10% 110%, rgba(94,224,192,.14), transparent 55%),
+      linear-gradient(160deg, var(--bg0), var(--bg1));
+    background-attachment:fixed;
+  }
+  .card { background:var(--card); border:1px solid var(--stroke); border-radius:20px; padding:32px;
+          width:min(94vw,410px); box-shadow:0 30px 70px -24px rgba(0,0,0,.8); backdrop-filter:blur(16px); }
+  .brand { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+  .logo { width:44px; height:44px; border-radius:13px; display:grid; place-items:center; font-size:22px;
+          background:linear-gradient(135deg,var(--accent),var(--accent2)); box-shadow:0 8px 24px -6px rgba(59,169,255,.6); }
+  h1 { margin:0; font-size:19px; letter-spacing:-.02em; }
+  .sub { margin:0; color:var(--muted); font-size:12.5px; }
+  p.lead { margin:0 0 18px; color:var(--muted); font-size:13.5px; }
+  label { display:block; font-size:12px; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); margin:14px 0 6px; }
+  input { width:100%; font-size:16px; padding:12px 14px; border-radius:12px; border:1px solid var(--stroke);
+          background:rgba(6,11,18,.75); color:var(--ink); outline:none; transition:border-color .15s, box-shadow .15s; }
+  input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(59,169,255,.2); }
+  #code { font-family:'JetBrains Mono',ui-monospace,monospace; letter-spacing:.5em; text-align:center; font-size:22px; }
+  .btns { display:flex; gap:10px; margin-top:22px; }
+  button { flex:1; font-size:14.5px; font-weight:650; padding:13px 0; border-radius:12px; border:none; cursor:pointer;
+           color:#04121e; background:linear-gradient(135deg,var(--accent),var(--accent2));
+           box-shadow:0 12px 26px -12px rgba(59,169,255,.8); transition:transform .12s, filter .12s, opacity .12s; }
+  button:hover:not(:disabled){ transform:translateY(-1px); filter:brightness(1.06); }
+  button.alt { background:transparent; border:1px solid var(--stroke); color:var(--ink); box-shadow:none; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  #msg { margin-top:14px; font-size:13px; min-height:18px; color:var(--err); }
+  #msg.ok { color:var(--ok); }
+  .link { background:none; border:none; color:var(--accent2); cursor:pointer; font-size:12.5px; padding:0; margin-top:12px; }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand">
+    <div class="logo">🔐</div>
+    <div><h1>RemoteLink</h1><p class="sub">Secure remote desktop</p></div>
+  </div>
+
+  <!-- STEP 1: credentials -->
+  <div id="step1">
+    <p class="lead">Sign in to view a shared screen. New here? Create an account with your <strong>Gmail</strong> — we email a code to confirm it's really you.</p>
+    <label for="email">Gmail address</label>
+    <input id="email" type="email" autocomplete="email" placeholder="you@gmail.com">
+    <label for="pw">Password</label>
+    <input id="pw" type="password" autocomplete="current-password" placeholder="••••••••">
+    <div class="btns">
+      <button id="loginBtn">Sign in</button>
+      <button id="signupBtn" class="alt">Create account</button>
+    </div>
+  </div>
+
+  <!-- STEP 2: email verification code -->
+  <div id="step2" class="hidden">
+    <p class="lead">We emailed a 6-digit code to <strong id="codeEmail"></strong>. Enter it to finish creating your account.</p>
+    <label for="code">Verification code</label>
+    <input id="code" inputmode="numeric" maxlength="6" placeholder="000000">
+    <div class="btns">
+      <button id="verifyBtn">Verify &amp; continue</button>
+      <button id="backBtn" class="alt">Back</button>
+    </div>
+    <button id="resendBtn" class="link">Resend code</button>
+  </div>
+
+  <div id="msg"></div>
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const email = $('email'), pw = $('pw'), code = $('code'), msg = $('msg');
+
+  const ERRORS = {
+    'not-gmail': 'Please use a valid @gmail.com address.',
+    'password-too-short': 'Password must be at least 6 characters.',
+    'account-exists': 'That account already exists — use Sign in.',
+    'wrong-email-or-password': 'Wrong email or password.',
+    'too-many-attempts': 'Too many attempts — wait a few minutes and retry.',
+    'no-pending-signup': 'Start again — no pending signup found.',
+    'code-expired': 'That code expired. Tap “Resend code”.',
+    'wrong-code': 'Incorrect code — check the email and retry.'
+  };
+  function setMsg(text, ok) { msg.textContent = text || ''; msg.className = ok ? 'ok' : ''; }
+  function show(step) { $('step1').classList.toggle('hidden', step !== 1); $('step2').classList.toggle('hidden', step !== 2); }
+
+  async function api(endpoint, payload) {
+    const res = await fetch(endpoint, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+    });
+    return { ok: res.ok, data: await res.json().catch(() => ({})) };
+  }
+  function finish(data) {
+    localStorage.setItem('rl_token', data.token);
+    localStorage.setItem('rl_email', data.email);
+    const next = new URLSearchParams(location.search).get('next');
+    location.href = next && next.indexOf('/') === 0 ? next : 'viewer.html';
+  }
+
+  $('loginBtn').onclick = async () => {
+    setMsg('');
+    try {
+      const { ok, data } = await api('/api/login', { email: email.value, password: pw.value });
+      if (!ok) return setMsg(ERRORS[data.error] || data.error || 'Something went wrong.');
+      finish(data);
+    } catch (e) { setMsg('Could not reach the server.'); }
+  };
+
+  $('signupBtn').onclick = async () => {
+    setMsg('');
+    try {
+      const { ok, data } = await api('/api/signup', { email: email.value, password: pw.value });
+      if (!ok) return setMsg(ERRORS[data.error] || data.error || 'Something went wrong.');
+      $('codeEmail').textContent = data.email;
+      show(2); setMsg('Code sent — check your inbox.', true); code.focus();
+    } catch (e) { setMsg('Could not reach the server.'); }
+  };
+
+  $('verifyBtn').onclick = async () => {
+    setMsg('');
+    try {
+      const { ok, data } = await api('/api/verify', { email: email.value, code: code.value });
+      if (!ok) return setMsg(ERRORS[data.error] || data.error || 'Something went wrong.');
+      finish(data);
+    } catch (e) { setMsg('Could not reach the server.'); }
+  };
+
+  $('resendBtn').onclick = async () => {
+    setMsg('');
+    try {
+      const { ok, data } = await api('/api/resend', { email: email.value });
+      setMsg(ok ? 'A new code is on its way.' : (ERRORS[data.error] || 'Could not resend.'), ok);
+    } catch (e) { setMsg('Could not reach the server.'); }
+  };
+
+  $('backBtn').onclick = () => { show(1); setMsg(''); };
+  pw.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('loginBtn').click(); });
+  code.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('verifyBtn').click(); });
+})();
+</script>
+</body>
+</html>

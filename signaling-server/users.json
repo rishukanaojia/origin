@@ -1,0 +1,82 @@
+{
+  "user001": {
+    "salt": "327a82ecc5b0b1d6f50fc10fae78ee52",
+    "hash": "c2ff839ff51807d96e4c48094f9eac07481b45c030dec0072c9f5a64f2c9d531"
+  },
+  "user002": {
+    "salt": "590cf6f9b12fa08ac09c585fea93c4e3",
+    "hash": "45cd12858cf111b6f3c5c77d3ae1d9e5a4a7e442820ca4666cd9fa51835e5039"
+  },
+  "user003": {
+    "salt": "419cedf2d5d6536fa3a1c8f8608d4f74",
+    "hash": "8ac3f77da1014516252917bc876e1482eab9f0eb703bfc4d80d467abf26540d9"
+  },
+  "user004": {
+    "salt": "fd4ec6d35832dd893f47cce907419655",
+    "hash": "3a9062a6e57ab84d52cc422a9d4629d36ecdb2b5ecea404f76f43dad759f47be"
+  },
+  "user005": {
+    "salt": "d868c49b8b411985ff2cd3cfcfb04fe0",
+    "hash": "ecc2a4ca75ea06d150c2ea7291339cbb2b70291b7d083edaba7a9d6c39fa4238"
+  },
+  "user006": {
+    "salt": "9322c628283a568ffd77d3ec5d95efff",
+    "hash": "bdf4e3e564d4e1ee7cd6286c8665b17564d6abd1a18822572cfb9f27d18160f3"
+  },
+  "user007": {
+    "salt": "c3549253d3e943e6fd461d6e264db749",
+    "hash": "d7fff051d4550c0fef26e4c55e7ce2982aa716721fa46453626511a7ac9d4106"
+  },
+  "user008": {
+    "salt": "acc80dff1a4be61d3d0e062b942976cd",
+    "hash": "a71a8418b44129ec019535934b846fcffec950d59529fb86c67b08cf0338f1ee"
+  },
+  "user009": {
+    "salt": "73c59b506a8048e25311df16cdbfe3e1",
+    "hash": "e79fbba893b9d26910a8a098ce6d6a6b8e1d941eeca1a7f93d57c7fb6ea1f1ca"
+  },
+  "user010": {
+    "salt": "e7637de49824f10b5244c925d335fb58",
+    "hash": "098cb94f77ed534e0afdb7d19864f718abeae7665a05aa388826776641ef9606"
+  },
+  "user011": {
+    "salt": "dc88a52c21fc05f1914892237becb441",
+    "hash": "400691a6b31fe3d29e442ca52da0ed36ab5a68bf9495a5c418c94875c816ded8"
+  },
+  "user012": {
+    "salt": "bec1ac9a30c125c8f9c32ecf78894f0a",
+    "hash": "0f4c135b5e4a5a1740d39a592038ac5c3d1524cf847b99204f184147e0efed69"
+  },
+  "user013": {
+    "salt": "6c32052c7408d6ffb6e420823c805a68",
+    "hash": "ddc420b84e99d0ae4255ba9063da9424f1b108159498db8cde4319412f89fa13"
+  },
+  "user014": {
+    "salt": "fc7d9a5da4499422551eae70aaaf2f44",
+    "hash": "3becd45e00b859c97d5ed2a121d8d1e91045cf5087a3d0a523756c034bc48182"
+  },
+  "user015": {
+    "salt": "ab5ef40c1a4b5a5ebed1541697ca5386",
+    "hash": "303e5507c9d03a1e4c454192810f38d358b50c8a844d6bf972c3215930546fb6"
+  },
+  "user016": {
+    "salt": "749273323c6636342711e33316b1a099",
+    "hash": "a29bd5bd22c71eccbcf812f72a4b3937db05caa571b959d26b1acbef2bdfb0db"
+  },
+  "user017": {
+    "salt": "a03d6f1b49090eb2229aa807f0788217",
+    "hash": "8c19d3f8e77c272845aa28328b8d1a2bb18eb37b5c3f36d322a260d42478078f"
+  },
+  "user018": {
+    "salt": "9db4a78734b8ca769184313577e32e34",
+    "hash": "14bed757939c823cbbf4f693b1c64e4cf7fd9f18a4ce034829356c97b1c60a2a"
+  },
+  "user019": {
+    "salt": "c777a9a2db094bd198b0989a3a5f7dda",
+    "hash": "3eb0d02ace3257bd31be3adb6570c96499063ba18a6f9dc3a79844697ee89ef9"
+  },
+  "user020": {
+    "salt": "ba4e1bcea104847649d4d6065a68885a",
+    "hash": "661dca731ebc7339f043e021fa1b268641dfd1ac322cf35c5c1377bd698ea632"
+  }
+}

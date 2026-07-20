@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RemoteLink — Host</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg0:#070b12; --bg1:#0e1826; --card:rgba(20,30,44,.72); --stroke:rgba(120,150,190,.16);
+    --ink:#eef4fb; --muted:#93a6bd; --accent:#3ba9ff; --accent2:#5ee0c0;
+    --danger:#ff6b6b; --ok:#4ecb84; --warn:#e6b153;
+    --radius:16px; --shadow:0 18px 50px -18px rgba(0,0,0,.7);
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; min-height:100vh; color:var(--ink);
+    font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif; line-height:1.55;
+    background:
+      radial-gradient(1200px 600px at 85% -10%, rgba(59,169,255,.18), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(94,224,192,.14), transparent 55%),
+      linear-gradient(160deg, var(--bg0), var(--bg1));
+    background-attachment:fixed;
+  }
+  header { padding:26px 24px 8px; max-width:900px; margin:0 auto; display:flex; align-items:center; gap:14px; }
+  .logo { width:44px; height:44px; border-radius:12px; display:grid; place-items:center; font-size:22px;
+          background:linear-gradient(135deg,var(--accent),var(--accent2)); box-shadow:0 8px 24px -6px rgba(59,169,255,.6); }
+  header h1 { margin:0; font-size:20px; letter-spacing:-.02em; }
+  header p { margin:2px 0 0; color:var(--muted); font-size:13.5px; }
+  .pill { margin-left:auto; font-size:12px; color:var(--muted); border:1px solid var(--stroke);
+          padding:6px 12px; border-radius:999px; background:rgba(255,255,255,.03); }
+  main { max-width:900px; margin:0 auto; padding:16px 24px 48px; }
+  .card { background:var(--card); border:1px solid var(--stroke); border-radius:var(--radius);
+          padding:24px; margin-bottom:20px; box-shadow:var(--shadow); backdrop-filter:blur(14px); }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  @media (max-width:640px){ .grid { grid-template-columns:1fr; } }
+  label { display:block; font-size:12px; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
+  .field { display:flex; gap:10px; align-items:center; }
+  input { font-family:'JetBrains Mono',ui-monospace,monospace; font-size:20px; letter-spacing:.12em;
+          padding:12px 16px; width:100%; border-radius:12px; border:1px solid var(--stroke);
+          background:rgba(6,11,18,.75); color:var(--accent2); outline:none; transition:border-color .15s, box-shadow .15s; }
+  input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(59,169,255,.2); }
+  .btnrow { display:flex; flex-wrap:wrap; gap:10px; margin-top:20px; }
+  button { font-size:14.5px; font-weight:650; padding:12px 20px; border-radius:12px; border:none; cursor:pointer;
+           color:#04121e; background:linear-gradient(135deg,var(--accent),var(--accent2));
+           box-shadow:0 10px 24px -10px rgba(59,169,255,.8); transition:transform .12s, filter .12s, opacity .12s; }
+  button:hover:not(:disabled) { transform:translateY(-1px); filter:brightness(1.06); }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  button.ghost { background:transparent; color:var(--ink); border:1px solid var(--stroke); box-shadow:none; }
+  button.danger { background:linear-gradient(135deg,#ff7a7a,#e0554e); color:#2a0808; }
+  .status { display:inline-flex; align-items:center; gap:9px; font-size:13.5px; color:var(--muted); }
+  .dot { width:10px; height:10px; border-radius:50%; background:#65788c; box-shadow:0 0 0 0 rgba(0,0,0,0); }
+  .dot.wait { background:var(--warn); animation:pulse 1.6s infinite; }
+  .dot.live { background:var(--ok); animation:pulse 1.6s infinite; }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 currentColor;opacity:1} 70%{box-shadow:0 0 0 7px transparent;opacity:.7} 100%{opacity:1} }
+  video { width:100%; border-radius:12px; background:#000; margin-top:16px; display:none; border:1px solid var(--stroke); }
+  #log { font-family:'JetBrains Mono',ui-monospace,monospace; font-size:11.5px; color:#8fb4c9;
+         background:rgba(6,11,18,.7); border:1px solid var(--stroke); border-radius:12px; padding:14px;
+         height:150px; overflow:auto; white-space:pre-wrap; }
+  .hint { font-size:12.5px; color:var(--muted); }
+  code { font-family:ui-monospace,monospace; color:var(--accent2); background:rgba(94,224,192,.08); padding:1px 6px; border-radius:6px; }
+  .lead { font-size:13px; color:var(--muted); margin:0 0 4px; }
+  .big { font-size:26px; letter-spacing:.18em; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">🖥️</div>
+  <div>
+    <h1>RemoteLink · Host</h1>
+    <p>Share this screen securely. A viewer needs the Session ID <em>and</em> your access password.</p>
+  </div>
+  <span class="pill" id="hostPill">Ready</span>
+</header>
+<main>
+  <div class="card">
+    <div class="grid">
+      <div>
+        <label for="sid">Session ID</label>
+        <input id="sid" class="big" value="" maxlength="11" autocomplete="off" readonly>
+        <p class="hint" style="margin:8px 0 0;">Auto-generated, like an AnyDesk address. New one each session.</p>
+      </div>
+      <div>
+        <label for="access">Access password <span style="text-transform:none;letter-spacing:0;">(viewers must enter this)</span></label>
+        <div class="field">
+          <input id="access" type="text" value="" autocomplete="off" style="letter-spacing:.08em;font-size:18px;">
+          <button class="ghost" id="regenPw" title="Generate a new one" style="padding:12px 14px;">↻</button>
+        </div>
+        <p class="hint" style="margin:8px 0 0;">Keeps strangers with the link out. Share it privately, not in the same message as the link.</p>
+      </div>
+    </div>
+
+    <div class="btnrow">
+      <button id="startBtn">▶ Start sharing</button>
+      <button id="stopBtn" class="danger" style="display:none;">■ Stop sharing</button>
+      <button id="inviteBtn" class="ghost" style="display:none;">✉ Invite via email</button>
+    </div>
+
+    <p class="hint" style="margin-top:16px;">
+      <span class="status"><span id="dot" class="dot"></span><span id="statusText">Not sharing</span></span>
+    </p>
+    <video id="preview" playsinline muted></video>
+  </div>
+
+  <div class="card">
+    <label>Live control activity</label>
+    <p class="hint" style="margin:0 0 12px;">
+      <span class="status"><span id="agentDot" class="dot"></span><span id="agentText">Native control: connecting to agent…</span></span>
+    </p>
+    <div id="log">Waiting…</div>
+    <p class="hint" style="margin-top:12px;">
+      Mouse/keyboard events from the viewer are replayed on this desktop by the local
+      <strong>input agent</strong> (<code>node agent.js</code> → <code>xdotool</code>). If the agent isn't running, events are only logged here.
+    </p>
+  </div>
+</main>
+
+<script src="config.js"></script>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const sidInput = $('sid'), accessInput = $('access'), startBtn = $('startBtn'), stopBtn = $('stopBtn');
+  const preview = $('preview'), inviteBtn = $('inviteBtn'), regenPw = $('regenPw');
+  const dot = $('dot'), statusText = $('statusText'), logEl = $('log'), hostPill = $('hostPill');
+
+  // A friendly 9-digit Session ID, AnyDesk style.
+  function genId() {
+    let s = '';
+    for (let i = 0; i < 9; i++) s += Math.floor(Math.random() * 10);
+    return s.slice(0, 3) + ' ' + s.slice(3, 6) + ' ' + s.slice(6);
+  }
+  // A short, readable access password (no ambiguous chars).
+  function genPw() {
+    const cs = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let s = '';
+    for (let i = 0; i < 6; i++) s += cs[Math.floor(Math.random() * cs.length)];
+    return s;
+  }
+  sidInput.value = genId();
+  accessInput.value = genPw();
+  regenPw.onclick = () => { if (!startBtn.disabled) accessInput.value = genPw(); };
+
+  // Capped log so long sessions don't build an ever-growing string (that was
+  // a real source of CPU lag).
+  const logLines = [];
+  function log(...a) {
+    logLines.unshift(a.join(' '));
+    if (logLines.length > 150) logLines.length = 150;
+    logEl.textContent = logLines.join('\n');
+  }
+  function setStatus(cls, text) { dot.className = 'dot ' + cls; statusText.textContent = text; }
+
+  let ws, pc, localStream, controlChannel;
+
+  // ---- Local input agent bridge -------------------------------------------
+  let agent = null;
+  const agentDot = $('agentDot'), agentText = $('agentText');
+  function connectAgent() {
+    try { agent = new WebSocket('ws://127.0.0.1:9091'); } catch (e) { agent = null; return; }
+    agent.onopen = () => {
+      agentDot.className = 'dot live';
+      agentText.textContent = 'Native control: ACTIVE (agent connected)';
+    };
+    agent.onclose = agent.onerror = () => {
+      agent = null;
+      agentDot.className = 'dot wait';
+      agentText.textContent = 'Native control: off — run "node agent.js" (events logged only)';
+      setTimeout(connectAgent, 3000);
+    };
+  }
+  connectAgent();
+
+  startBtn.onclick = async () => {
+    const id = sidInput.value.trim();
+    if (!id) return;
+    startBtn.disabled = true; accessInput.readOnly = true; regenPw.disabled = true;
+
+    try {
+      const dpr = window.devicePixelRatio || 1;
+      localStream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          frameRate: { ideal: 30, max: 30 },
+          width: { ideal: Math.round(screen.width * dpr) },
+          height: { ideal: Math.round(screen.height * dpr) }
+        },
+        audio: false
+      });
+    } catch (e) {
+      log('Screen capture denied:', e.message);
+      startBtn.disabled = false; accessInput.readOnly = false; regenPw.disabled = false; return;
+    }
+    preview.style.display = 'block';
+    preview.srcObject = localStream;
+    preview.play().catch(() => {});
+    localStream.getVideoTracks()[0].addEventListener('ended', stopSharing);
+    localStream.getVideoTracks()[0].contentHint = 'text';
+    stopBtn.style.display = 'inline-block';
+    inviteBtn.style.display = 'inline-block';
+    hostPill.textContent = 'Sharing';
+
+    connectSignaling(id);
+  };
+
+  // Compose an invite via the user's email app. We deliberately DO NOT put the
+  // access password in the invite — the host shares that separately for privacy.
+  inviteBtn.onclick = () => {
+    const id = sidInput.value.trim();
+    const link = location.origin + '/viewer.html?sid=' + id.replace(/\s/g, '');
+    const subject = 'Invitation to view my screen (RemoteLink)';
+    const body = 'Hi,\n\n'
+      + 'I\'m inviting you to view and control my screen.\n\n'
+      + '1. Open this link:  ' + link + '\n'
+      + '2. Sign in — or create an account (a code is emailed to verify it\'s you).\n'
+      + '3. The Session ID (' + id + ') is pre-filled. Enter the access password I\'ll send you separately, then Connect.\n\n'
+      + 'The link only works while I\'m sharing.\n';
+    location.href = 'mailto:?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+  };
+
+  function stopSharing() {
+    if (localStream) { localStream.getTracks().forEach((t) => t.stop()); localStream = null; }
+    if (pc) { pc.close(); pc = null; }
+    if (ws) { ws.onclose = null; ws.close(); ws = null; }
+    preview.srcObject = null; preview.style.display = 'none';
+    stopBtn.style.display = 'none';
+    inviteBtn.style.display = 'none';
+    startBtn.disabled = false; accessInput.readOnly = false; regenPw.disabled = false;
+    sidInput.value = genId();
+    accessInput.value = genPw();
+    hostPill.textContent = 'Ready';
+    setStatus('', 'Not sharing');
+    log('Sharing stopped.');
+  }
+  stopBtn.onclick = stopSharing;
+
+  function connectSignaling(id) {
+    ws = new WebSocket(window.SIGNAL_URL);
+    ws.onopen = () => {
+      // Send the access password so the server can gate viewers on it.
+      ws.send(JSON.stringify({ type: 'register', id, access: accessInput.value.trim() }));
+    };
+    ws.onmessage = async (ev) => {
+      const msg = JSON.parse(ev.data);
+      switch (msg.type) {
+        case 'registered':
+          setStatus('wait', 'Waiting for viewer · ID ' + id);
+          log('Registered. Session ID:', id);
+          break;
+        case 'peer-joined':
+          // Rejoin-safe: drop any previous connection before offering afresh.
+          if (pc) { pc.close(); pc = null; }
+          log('Viewer joined' + (msg.email ? ' (' + msg.email + ')' : '') + ' — creating offer.');
+          await startPeer();
+          break;
+        case 'answer':
+          if (pc) { await pc.setRemoteDescription(msg.sdp); log('Got answer — negotiating…'); }
+          break;
+        case 'candidate':
+          if (msg.candidate && pc) { try { await pc.addIceCandidate(msg.candidate); } catch (e) {} }
+          break;
+        case 'peer-left':
+          log('Viewer disconnected — session still open, they can rejoin.');
+          setStatus('wait', 'Waiting for viewer · ID ' + id);
+          if (pc) { pc.close(); pc = null; }
+          break;
+        case 'error':
+          log('Signaling error:', msg.reason);
+          setStatus('', 'Error: ' + msg.reason);
+          break;
+      }
+    };
+    ws.onclose = () => log('Signaling connection closed.');
+  }
+
+  async function startPeer() {
+    pc = new RTCPeerConnection(window.RTC_CONFIG);
+    localStream.getTracks().forEach((t) => pc.addTrack(t, localStream));
+
+    const sender = pc.getSenders().find((s) => s.track && s.track.kind === 'video');
+    if (sender) {
+      const params = sender.getParameters();
+      if (!params.encodings || !params.encodings.length) params.encodings = [{}];
+      params.encodings[0].maxBitrate = 6000000;
+      params.degradationPreference = 'maintain-resolution';
+      sender.setParameters(params).catch(() => {});
+    }
+
+    controlChannel = pc.createDataChannel('control', { ordered: true });
+    controlChannel.onopen = () => {
+      log('Control channel open.');
+      const s = localStream.getVideoTracks()[0].getSettings();
+      if (s.width && s.height) controlChannel.send(JSON.stringify({ t: 'screen', w: s.width, h: s.height }));
+    };
+    controlChannel.onmessage = (e) => handleControl(JSON.parse(e.data));
+
+    pc.onicecandidate = (e) => {
+      if (e.candidate) ws.send(JSON.stringify({ type: 'candidate', candidate: e.candidate }));
+    };
+    pc.onconnectionstatechange = () => {
+      const st = pc.connectionState;
+      if (st === 'connected') { setStatus('live', 'Live — viewer connected'); hostPill.textContent = 'Live'; }
+      else if (st === 'failed' || st === 'disconnected') setStatus('wait', 'Reconnecting…');
+      log('Connection state:', st);
+    };
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    ws.send(JSON.stringify({ type: 'offer', sdp: pc.localDescription }));
+  }
+
+  function handleControl(ev) {
+    if (agent && agent.readyState === WebSocket.OPEN) agent.send(JSON.stringify(ev));
+    if (ev.t === 'move')   log('MOVE  x=' + ev.x + ' y=' + ev.y);
+    else if (ev.t === 'down') log('CLICK down btn=' + ev.b + ' @' + ev.x + ',' + ev.y);
+    else if (ev.t === 'up')   log('CLICK up   btn=' + ev.b);
+    else if (ev.t === 'key')  log('KEY   ' + (ev.down ? 'down' : 'up') + ' "' + ev.k + '"');
+    else if (ev.t === 'wheel') log('WHEEL dy=' + ev.dy);
+  }
+})();
+</script>
+</body>
+</html>

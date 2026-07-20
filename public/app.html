@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RemoteLink</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0e1826">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="RemoteLink">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+  }
+</script>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg0:#070b12; --bg1:#0e1826; --card:rgba(20,30,44,.72); --stroke:rgba(120,150,190,.16);
+    --ink:#eef4fb; --muted:#93a6bd; --accent:#3ba9ff; --accent2:#5ee0c0;
+    --danger:#ff6b6b; --ok:#4ecb84; --warn:#e6b153; --radius:16px;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; min-height:100vh; color:var(--ink);
+    font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif; line-height:1.55;
+    background:
+      radial-gradient(1200px 600px at 85% -10%, rgba(59,169,255,.18), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(94,224,192,.14), transparent 55%),
+      linear-gradient(160deg, var(--bg0), var(--bg1));
+    background-attachment:fixed;
+  }
+  header { padding:22px 24px 4px; max-width:1200px; margin:0 auto; display:flex; align-items:center; gap:14px; }
+  .logo { width:44px; height:44px; border-radius:12px; display:grid; place-items:center; font-size:22px;
+          background:linear-gradient(135deg,var(--accent),var(--accent2)); box-shadow:0 8px 24px -6px rgba(59,169,255,.6); }
+  header h1 { margin:0; font-size:20px; letter-spacing:-.02em; }
+  header p { margin:2px 0 0; color:var(--muted); font-size:13px; }
+  .pill { margin-left:auto; font-size:12px; border:1px solid var(--stroke); padding:7px 13px; border-radius:999px;
+          background:rgba(255,255,255,.03); display:inline-flex; align-items:center; gap:8px; }
+  .dot { width:9px; height:9px; border-radius:50%; background:#65788c; }
+  .dot.ok { background:var(--ok); } .dot.wait { background:var(--warn); } .dot.err { background:var(--danger); }
+  main { max-width:1200px; margin:0 auto; padding:16px 24px 48px; }
+  .cards { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  @media (max-width:760px){ .cards { grid-template-columns:1fr; } }
+  .card { background:var(--card); border:1px solid var(--stroke); border-radius:var(--radius); padding:22px;
+          box-shadow:0 18px 50px -18px rgba(0,0,0,.7); backdrop-filter:blur(14px); }
+  .card h2 { margin:0 0 4px; font-size:15px; }
+  .card .desc { margin:0 0 16px; color:var(--muted); font-size:12.5px; }
+  label { display:block; font-size:11.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); margin:14px 0 6px; }
+  .idbox { font-family:'JetBrains Mono',ui-monospace,monospace; font-size:30px; letter-spacing:.16em;
+           color:var(--accent2); background:rgba(6,11,18,.7); border:1px solid var(--stroke);
+           border-radius:12px; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; }
+  .idbox button { font-size:12px; padding:7px 10px; }
+  input { font-family:'JetBrains Mono',ui-monospace,monospace; font-size:18px; letter-spacing:.1em;
+          padding:12px 14px; width:100%; border-radius:12px; border:1px solid var(--stroke);
+          background:rgba(6,11,18,.75); color:var(--ink); outline:none; transition:border-color .15s, box-shadow .15s; }
+  input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(59,169,255,.2); }
+  .row { display:flex; gap:10px; }
+  button { font-size:14px; font-weight:650; padding:12px 18px; border-radius:12px; border:none; cursor:pointer;
+           color:#04121e; background:linear-gradient(135deg,var(--accent),var(--accent2));
+           box-shadow:0 10px 24px -12px rgba(59,169,255,.8); transition:transform .12s, filter .12s, opacity .12s; }
+  button:hover:not(:disabled){ transform:translateY(-1px); filter:brightness(1.06); }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  button.ghost { background:transparent; color:var(--ink); border:1px solid var(--stroke); box-shadow:none; }
+  button.danger { background:linear-gradient(135deg,#ff7a7a,#e0554e); color:#2a0808; }
+  .hint { font-size:12px; color:var(--muted); }
+  .note { font-size:12px; color:var(--warn); min-height:16px; margin-top:10px; }
+
+  /* Session view */
+  #session { display:none; }
+  .toolbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px;
+             background:var(--card); border:1px solid var(--stroke); border-radius:var(--radius); padding:12px 14px; backdrop-filter:blur(14px); }
+  .toolbar .who { font-size:13px; color:var(--muted); }
+  .toolbar .spacer { margin-left:auto; }
+  .screen { position:relative; border-radius:var(--radius); overflow:hidden; background:#000;
+            border:1px solid var(--stroke); box-shadow:0 30px 70px -30px rgba(0,0,0,.8); }
+  video { display:block; width:100%; outline:none; background:#000; }
+  .screen.controlling video { cursor:crosshair; }
+  .screen:fullscreen { border:none; border-radius:0; }
+  .screen:fullscreen video { width:100%; height:100%; object-fit:contain; }
+  #kb { position:absolute; bottom:0; left:0; width:1px; height:1px; opacity:0; border:none; padding:0; font-size:16px; }
+  #fsKb { display:none; position:absolute; top:14px; right:14px; z-index:2; opacity:.8; font-size:18px; padding:9px 13px;
+          background:rgba(10,18,28,.8); color:var(--ink); border:1px solid var(--stroke); }
+  .screen:fullscreen #fsKb { display:block; }
+  .overlay { position:absolute; inset:0; display:grid; place-items:center; text-align:center; padding:24px;
+             color:#9fb2c4; font-size:15px; background:radial-gradient(circle at center, rgba(20,30,44,.4), rgba(7,11,18,.85)); }
+  #log { font-family:'JetBrains Mono',ui-monospace,monospace; font-size:11px; color:#8fb4c9; margin-top:14px;
+         background:rgba(6,11,18,.7); border:1px solid var(--stroke); border-radius:12px; padding:12px; height:96px; overflow:auto; white-space:pre-wrap; }
+
+  /* On-screen key bar */
+  .keys { display:none; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+  .keys.show { display:flex; }
+  .key { font-size:13px; font-weight:600; padding:9px 13px; border-radius:9px; cursor:pointer;
+         background:rgba(255,255,255,.06); color:var(--ink); border:1px solid var(--stroke); box-shadow:none;
+         min-width:44px; }
+  .key:active { transform:translateY(1px); }
+  .key.mod.armed { background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#04121e; border-color:transparent; }
+
+  /* Incoming-call modal */
+  .modal { position:fixed; inset:0; display:none; place-items:center; background:rgba(4,8,14,.72); z-index:10; }
+  .modal .box { background:var(--bg1); border:1px solid var(--stroke); border-radius:18px; padding:26px; width:min(92vw,360px); text-align:center; box-shadow:0 30px 70px -20px #000; }
+  .modal h3 { margin:0 0 6px; }
+  .modal p { margin:0 0 18px; color:var(--muted); font-size:13.5px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">🖥️</div>
+  <div>
+    <h1>RemoteLink</h1>
+    <p>Peer-to-peer remote desktop. Your ID is permanent — share it to let others connect.</p>
+  </div>
+  <button id="installBtn" class="ghost" style="display:none;margin-left:auto;">⬇ Install app</button>
+  <span class="pill" id="netPill"><span id="netDot" class="dot"></span><span id="netText">connecting…</span></span>
+</header>
+
+<main>
+  <!-- ============ HOME (not in a call) ============ -->
+  <div id="home">
+    <div class="cards">
+      <div class="card">
+        <h2>Your machine</h2>
+        <p class="desc">Give this ID and password to whoever should connect to you.</p>
+        <label>Your permanent ID</label>
+        <div class="idbox"><span id="myId">— — —</span><button class="ghost" id="copyId">Copy</button></div>
+        <label for="myAccess">Access password <span style="text-transform:none;letter-spacing:0;">(others must enter it)</span></label>
+        <div class="row">
+          <input id="myAccess" type="text" autocomplete="off" style="letter-spacing:.08em;">
+          <button class="ghost" id="regenPw" title="New password" style="padding:12px 14px;">↻</button>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:10px;text-transform:none;letter-spacing:0;font-size:13px;cursor:pointer;">
+          <input type="checkbox" id="fixedChk" style="width:auto;"> Fixed — keep this ID &amp; password the same every time
+        </label>
+
+        <div id="serverCard" style="display:none;margin-top:16px;border-top:1px solid var(--stroke);padding-top:14px;">
+          <label style="margin-top:0;">Use this device as the server</label>
+          <p class="hint" style="margin:0 0 10px;">Other devices reach this one by putting its address (or connect code) in their <strong>Server</strong> field.</p>
+
+          <div id="lanBox" style="display:none;margin-bottom:14px;">
+            <label style="margin-top:0;">Same network — no internet, no tunnel</label>
+            <div class="idbox" style="font-size:13px;letter-spacing:0;">
+              <span id="lanUrl" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</span>
+              <button class="ghost" id="copyLan">Copy</button>
+            </div>
+            <div class="idbox" style="font-size:11px;letter-spacing:0;margin-top:6px;">
+              <span id="lanCode" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</span>
+              <button class="ghost" id="copyLanCode">Code</button>
+            </div>
+            <p class="hint" style="margin:8px 0 0;">Clients on the same Wi-Fi paste this address (or the code) — fully local, private.</p>
+          </div>
+
+          <label style="margin-top:0;">Across networks (internet)</label>
+          <button id="tunnelBtn" class="ghost" style="width:100%;">🌐 Make this device reachable</button>
+          <div id="tunnelUrlBox" style="display:none;margin-top:10px;">
+            <label style="margin-top:0;">Connect code <span style="text-transform:none;letter-spacing:0;">(copy &amp; send — includes ID + password)</span></label>
+            <div class="idbox" style="font-size:12px;letter-spacing:0;">
+              <span id="connectCode" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</span>
+              <button class="ghost" id="copyCode">Copy</button>
+            </div>
+            <p class="hint" style="margin:8px 6px 0;">Or share the raw URL:</p>
+            <div class="idbox" style="font-size:12px;letter-spacing:0;">
+              <span id="tunnelUrl" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</span>
+              <button class="ghost" id="copyUrl">Copy</button>
+            </div>
+            <p class="hint" style="margin:8px 0 0;">Give the tunnel ~15s to go live. Keep this app open while sharing.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Connect to a machine</h2>
+        <p class="desc">Enter another machine's ID and its access password to view &amp; control it.</p>
+        <label for="targetId">Remote ID</label>
+        <input id="targetId" placeholder="000 000 000" maxlength="11" autocomplete="off">
+        <label for="targetAccess">Access password</label>
+        <input id="targetAccess" type="text" placeholder="password" autocomplete="off" style="letter-spacing:.04em;">
+        <div class="row" style="margin-top:18px;">
+          <button id="connectBtn" style="flex:1;">Connect →</button>
+        </div>
+        <p class="note" id="homeNote"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SESSION (in a call) ============ -->
+  <div id="session">
+    <div class="toolbar">
+      <span class="who" id="roleText">—</span>
+      <span class="spacer"></span>
+      <button class="ghost" id="swapBtn" title="Swap who shares and who controls">⇄ Swap roles</button>
+      <button class="ghost" id="kbBtn" disabled title="On-screen keyboard">⌨ Keyboard</button>
+      <button class="ghost" id="fsBtn" disabled title="Full screen">⛶ Full screen</button>
+      <button class="danger" id="hangupBtn">✕ Disconnect</button>
+    </div>
+    <!-- On-screen modifier keys — for touch devices with no physical Ctrl/Shift.
+         Ctrl/Shift/Alt/Win are sticky toggles (tap to arm, auto-release after the
+         next key); Esc/Tab/Del are one-shot. -->
+    <div class="keys" id="modKeys">
+      <button class="key mod" data-code="ControlLeft">Ctrl</button>
+      <button class="key mod" data-code="ShiftLeft">Shift</button>
+      <button class="key mod" data-code="AltLeft">Alt</button>
+      <button class="key mod" data-code="MetaLeft">Win</button>
+      <span style="width:8px"></span>
+      <button class="key" data-tap="Escape">Esc</button>
+      <button class="key" data-tap="Tab">Tab</button>
+      <button class="key" data-tap="Delete">Del</button>
+      <button class="key" data-tap="ArrowUp">↑</button>
+      <button class="key" data-tap="ArrowDown">↓</button>
+      <button class="key" data-tap="ArrowLeft">←</button>
+      <button class="key" data-tap="ArrowRight">→</button>
+    </div>
+    <div class="screen" id="screenBox">
+      <video id="remote" playsinline autoplay tabindex="0"></video>
+      <video id="preview" playsinline autoplay muted style="display:none;"></video>
+      <div class="overlay" id="overlay">Connecting…</div>
+      <button id="fsKb" title="On-screen keyboard">⌨</button>
+      <input id="kb" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
+    </div>
+    <div id="log"></div>
+  </div>
+</main>
+
+<!-- Incoming call prompt -->
+<div class="modal" id="incoming">
+  <div class="box">
+    <h3>Incoming connection</h3>
+    <p><strong id="callerId"></strong> wants to view and control this machine.</p>
+    <div class="row">
+      <button class="danger" id="declineBtn" style="flex:1;">Decline</button>
+      <button id="acceptBtn" style="flex:1;">Accept</button>
+    </div>
+  </div>
+</div>
+
+<!-- Login gate — nothing in the app works until signed in (server-enforced) -->
+<div class="modal" id="auth" style="display:none;">
+  <div class="box" style="text-align:left;width:min(94vw,380px);">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+      <div class="logo" style="width:40px;height:40px;font-size:20px;">🔐</div>
+      <div>
+        <h3 style="margin:0;">RemoteLink</h3>
+        <p style="margin:0;font-size:12px;">Sign in to continue</p>
+      </div>
+    </div>
+    <label for="aUser">Username</label>
+    <input id="aUser" autocomplete="username" placeholder="user001" style="letter-spacing:.04em;font-size:16px;">
+    <label for="aPw">Password</label>
+    <input id="aPw" type="password" autocomplete="current-password" placeholder="••••••••" style="letter-spacing:.04em;font-size:16px;">
+    <label for="aCode" style="margin-top:12px;">Connect code <span style="text-transform:none;letter-spacing:0;">(paste the code from the other device — fills everything)</span></label>
+    <div class="row">
+      <input id="aCode" placeholder="paste connect code…" autocomplete="off" style="letter-spacing:0;font-size:14px;">
+      <button class="ghost" id="applyCode" title="Apply code" style="padding:12px 14px;">Use</button>
+    </div>
+    <label for="aServer" style="margin-top:12px;">Server <span style="text-transform:none;letter-spacing:0;">(or set the URL manually)</span></label>
+    <input id="aServer" placeholder="https://your-server.onrender.com" autocomplete="off" style="letter-spacing:0;font-size:14px;">
+    <button id="loginBtn" style="width:100%;margin-top:20px;">Sign in</button>
+    <p class="note" id="authNote"></p>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

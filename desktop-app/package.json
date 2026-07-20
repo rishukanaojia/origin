@@ -1,0 +1,39 @@
+{
+  "name": "remotelink-desktop",
+  "version": "1.0.0",
+  "description": "RemoteLink — installable peer-to-peer remote desktop app.",
+  "author": "RemoteLink",
+  "homepage": "https://github.com/remotelink/remotelink",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.remotelink.app",
+    "productName": "RemoteLink",
+    "files": ["main.js", "preload.js"],
+    "artifactName": "${productName}-${version}-${platform}.${ext}",
+    "extraResources": [
+      { "from": "../public", "to": "public" },
+      { "from": "../signaling-server", "to": "signaling-server" },
+      { "from": "../cloudflared", "to": "cloudflared" }
+    ],
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Network",
+      "maintainer": "RemoteLink <noreply@remotelink.app>",
+      "description": "Peer-to-peer remote desktop — control any machine from any device."
+    },
+    "win":   { "target": ["portable"], "signAndEditExecutable": false },
+    "mac":   { "target": ["dmg", "zip"], "category": "public.app-category.utilities" }
+  },
+  "comment": "Build native installers ON each OS: `npm run dist` (Linux→AppImage, Windows→.exe, macOS→.dmg). nut.js pulls the right prebuilt binary per platform automatically.",
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3"
+  },
+  "dependencies": {
+    "ws": "^7.5.9"
+  }
+}

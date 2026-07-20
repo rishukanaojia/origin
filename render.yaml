@@ -1,0 +1,13 @@
+# RemoteLink — deploy the shared signaling server to Render.com (free).
+# Render auto-detects this file via  New -> Blueprint.
+services:
+  - type: web
+    name: remotelink-signaling
+    runtime: node
+    plan: free
+    rootDir: signaling-server
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_VERSION
+        value: "20"

@@ -51,16 +51,22 @@ if (window.FORCE_RELAY) window.RTC_CONFIG.iceTransportPolicy = 'relay';
 // SERVER_BASE is the HTTP(S) origin used for login (/api/*); SIGNAL_URL is the
 // matching ws(s):// endpoint for signaling. The input agent always stays local
 // (ws://127.0.0.1:9091), so control still works on each machine.
+// PERMANENT hosted server (Render). Every install uses this by default, so two
+// devices on ANY network connect with just a 9-digit ID + password — no URL,
+// no connect code. A user can still override it via the login "Server" field.
+window.RL_DEFAULT_SERVER = 'https://remotelink-signaling-gfx1.onrender.com';
+
 (function () {
   var saved = '';
   try { saved = localStorage.getItem('rl_server') || ''; } catch (e) {}
-  saved = saved.replace(/\/+$/, '');   // strip trailing slash
+  // Precedence: user override (Server field) > baked-in permanent server > local.
+  var base = (saved || window.RL_DEFAULT_SERVER || '').replace(/\/+$/, '');
 
-  if (saved) {
-    window.SERVER_BASE = saved;                                   // e.g. https://my-server.onrender.com
-    window.SIGNAL_URL = saved.replace(/^http/, 'ws');            // -> wss://my-server.onrender.com
+  if (base) {
+    window.SERVER_BASE = base;                                   // e.g. https://my-server.onrender.com
+    window.SIGNAL_URL = base.replace(/^http/, 'ws');            // -> wss://my-server.onrender.com
   } else {
-    window.SERVER_BASE = '';                                      // same origin (built-in server)
+    window.SERVER_BASE = '';                                     // same origin (built-in server)
     window.SIGNAL_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host;
   }
 })();

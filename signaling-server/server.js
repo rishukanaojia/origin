@@ -241,13 +241,22 @@ wss.on('connection', (ws) => {
         let id = String(msg.id || '').trim();
         let rec = id ? peers[id] : null;
 
-        if (!id || !rec) {
-          id = allocateId();               // new device -> unique ID from the server
+        if (!id) {
+          id = allocateId();               // brand-new device -> unique ID from the server
           rec = null;
-        } else if (!safeEqual(rec.secret, secret) || rec.owner !== user) {
-          // Not this device's ID (or not this user's) — refuse; client re-registers fresh.
-          return send(ws, { type: 'register-failed', reason: 'id-owned' });
+        } else if (rec) {
+          // Known ID — must match this device's secret and owner, else it's taken.
+          if (!safeEqual(rec.secret, secret) || rec.owner !== user) {
+            return send(ws, { type: 'register-failed', reason: 'id-owned' });
+          }
+        } else if (!/^\d{3} \d{3} \d{3}$/.test(id)) {
+          id = allocateId();               // malformed stored ID -> fresh one
+          rec = null;
         }
+        // else: a well-formed ID the server has no record of (its storage reset on
+        // the free tier). Let the device RECLAIM it so permanent IDs stay stable
+        // across server restarts. It is re-bound to this owner+secret just below,
+        // so a DIFFERENT device claiming the same ID is rejected as 'id-owned'.
 
         const accessSalt = (rec && rec.accessSalt) || crypto.randomBytes(8).toString('hex');
         const access = String(msg.access || '');

@@ -158,7 +158,16 @@
         } else setNet('err', 'registration failed: ' + msg.reason);
         break;
       case 'displaced':
-        setNet('wait', 'opened elsewhere');
+        // Another live connection registered our ID (e.g. two devices collided
+        // on the same ID after the server's storage reset). Self-heal: drop the
+        // ID so the reconnect gets a fresh unique one instead of getting stuck.
+        // (If you deliberately opened the app in a second window, this simply
+        // gives this window its own ID — both keep working.)
+        log('ID was in use elsewhere — getting a fresh unique ID.');
+        myId = ''; localStorage.removeItem('rl_id');
+        setNet('wait', 'reassigning ID…');
+        // The server closes this socket; our reconnect then registers with an
+        // empty ID, so the server allocates a new unique one automatically.
         break;
       case 'ringing':
         homeNote('Ringing ' + msg.peer + '… waiting for them to accept.');
@@ -461,17 +470,9 @@
 
   $('hangupBtn').onclick = () => { sendWS({ type: 'hangup' }); endSession('you-hung-up'); };
 
-  // ---- Role swap ------------------------------------------------------------
-  $('swapBtn').onclick = () => { sendWS({ type: 'swap' }); doSwap(true); };
-  function doSwap(initiator) {
-    // Reverse roles and renegotiate. Deterministic: the new sharer offers.
-    role = (role === 'sharer') ? 'controller' : 'sharer';
-    log('Swapped — now ' + role);
-    $('overlay').style.display = 'grid';
-    $('overlay').textContent = 'Swapping roles…';
-    connectAgentIfSharer();
-    buildPeer();
-  }
+  // ---- Role swap (button removed; kept as a no-op so peer 'swap' messages
+  //      from an older build don't break anything) ------------------------------
+  function doSwap() { /* disabled */ }
 
   function updateRoleUI() {
     const controlling = role === 'controller';
@@ -627,6 +628,17 @@
     btn.addEventListener('pointerdown', (e) => e.preventDefault());
     btn.onclick = () => tapKey(btn.dataset.tap);   // tapKey releases armed mods after
   });
+  // One-shot PHYSICAL-code keys (e.g. Win/Super): single tap = full press+release,
+  // combined with any armed modifiers, then releases them.
+  document.querySelectorAll('#modKeys .key[data-tapcode]').forEach((btn) => {
+    btn.addEventListener('pointerdown', (e) => e.preventDefault());
+    btn.onclick = () => {
+      const c = btn.dataset.tapcode;
+      ctlSend({ t: 'key', code: c, down: true });
+      ctlSend({ t: 'key', code: c, down: false });
+      releaseArmedMods();
+    };
+  });
 
   // On-screen keyboard (tablets)
   const SENTINEL = ' ';
@@ -643,7 +655,11 @@
   });
 
   // Fullscreen
-  fsBtn.onclick = () => { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); else screenBox.requestFullscreen().catch(() => {}); };
+  function exitFs() { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); }
+  fsBtn.onclick = () => { if (document.fullscreenElement) exitFs(); else screenBox.requestFullscreen().catch(() => {}); };
+  // Visible in-fullscreen exit button (keyboard-lock can trap Esc, so a tap/click
+  // is the reliable way out).
+  $('fsExit').onclick = exitFs;
   document.addEventListener('fullscreenchange', () => {
     const fs = !!document.fullscreenElement;
     fsBtn.textContent = fs ? '⛶ Exit full screen' : '⛶ Full screen';
@@ -659,15 +675,35 @@
     'too-many-attempts': 'Too many attempts — wait 5 minutes.'
   };
   function authNote(t) { $('authNote').textContent = t || ''; }
-  function showAuth(on) { $('auth').style.display = on ? 'grid' : 'none'; }
+
+  // Two login modes:
+  //   'full'  — first time / no saved login: username + password REQUIRED (no Cancel).
+  //   'light' — returning user (saved token): only a connect code, and Cancel to
+  //             just use the app. Cannot unlock without a prior full login.
+  function showAuth(mode) {
+    if (!mode) { $('auth').style.display = 'none'; return; }
+    $('auth').style.display = 'grid';
+    const light = mode === 'light';
+    $('credRows').style.display = light ? 'none' : 'block';
+    $('cancelBtn').style.display = light ? 'block' : 'none';
+    $('loginBtn').textContent = light ? 'Connect' : 'Sign in';
+    $('authTitle').textContent = light
+      ? 'Signed in as ' + (localStorage.getItem('rl_user') || 'you') + ' — enter a code, or Cancel'
+      : 'Sign in to continue';
+    authNote('');
+  }
 
   function signOut(reason) {
     token = ''; localStorage.removeItem('rl_token');
     if (ws) { try { ws.close(); } catch (e) {} }
     wsReady = false;
-    showAuth(true); authNote(reason || '');
+    showAuth('full'); authNote(reason || '');
     setNet('', 'signed out');
   }
+
+  // Cancel (light mode only): dismiss the prompt and use the app — we're already
+  // authenticated via the saved token.
+  $('cancelBtn').onclick = () => { showAuth(false); };
 
   // Prefill the saved shared-server URL.
   try { $('aServer').value = localStorage.getItem('rl_server') || ''; } catch (e) {}
@@ -683,28 +719,63 @@
   };
   $('aCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('applyCode').click(); });
 
+  // Apply a pasted connect code (both modes): stash the target and switch server
+  // if the code carries a different one. Returns true if a reload was triggered.
+  function applyCodeIfAny() {
+    const codeVal = $('aCode').value.trim();
+    if (!codeVal) return false;
+    const parsed = parseConnectCode(codeVal);
+    if (!parsed) { authNote('That connect code is not valid.'); return 'invalid'; }
+    localStorage.setItem('rl_pending_target', JSON.stringify({ id: parsed.id, access: parsed.access }));
+    const server = (parsed.server || '').replace(/\/+$/, '');
+    const cur = (window.SERVER_BASE || '').replace(/\/+$/, '');
+    if (server && server !== cur) {
+      localStorage.setItem('rl_server', server);
+      authNote('Applying server… reloading.');
+      setTimeout(() => location.reload(), 300);
+      return true;   // reloading
+    }
+    return false;
+  }
+
   $('loginBtn').onclick = async () => {
+    const light = $('credRows').style.display === 'none';
+
+    // LIGHT mode: already signed in — just apply any code and connect.
+    if (light) {
+      const r = applyCodeIfAny();
+      if (r === 'invalid') return;
+      if (r === true) return;            // reloading with new server
+      showAuth(false);
+      if (wsReady) maybeAutoConnect();   // dial the stashed target now (else fires on register)
+      return;
+    }
+
+    // FULL mode (first time): username + password REQUIRED.
     const username = $('aUser').value.trim(), password = $('aPw').value;
     if (!username || !password) return authNote('Enter your username and password.');
 
-    // Save the shared-server URL (if given) BEFORE logging in, so both login
-    // and signaling go to the same server. Requires a reload to re-read config.
+    // Optional server override + optional code.
+    if (applyCodeIfAny() === 'invalid') return;
     const server = $('aServer').value.trim().replace(/\/+$/, '');
     const prevServer = (localStorage.getItem('rl_server') || '').replace(/\/+$/, '');
-    if (server !== prevServer) {
-      if (server) localStorage.setItem('rl_server', server);
-      else localStorage.removeItem('rl_server');
+    if (server && server !== prevServer) {
+      localStorage.setItem('rl_server', server);
       authNote('Applying server… reloading.');
-      return setTimeout(() => location.reload(), 300);   // config.js re-reads rl_server on load
+      return setTimeout(() => location.reload(), 300);
     }
 
     authNote('Signing in…');
+    // The free hosted server sleeps when idle; the first request can take ~50s
+    // to wake it. Reassure the user instead of looking frozen, and don't give up.
+    const slow = setTimeout(() => authNote('Waking the server… first connect can take up to a minute.'), 4000);
     try {
       const base = window.SERVER_BASE || '';
       const r = await fetch(base + '/api/login', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
       });
+      clearTimeout(slow);
       const data = await r.json().catch(() => ({}));
       if (!r.ok) return authNote(AUTH_ERR[data.error] || data.error || 'Sign-in failed.');
       token = data.token;
@@ -713,15 +784,26 @@
       showAuth(false); authNote('');
       setNet('wait', 'connecting…');
       connectWS();
-    } catch (e) { authNote('Cannot reach the server at ' + (window.SERVER_BASE || 'this app') + '.'); }
+    } catch (e) { clearTimeout(slow); authNote('Cannot reach the server — check your internet, then retry.'); }
   };
   $('aServer').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('loginBtn').click(); });
   $('aPw').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('loginBtn').click(); });
   $('aUser').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('aPw').focus(); });
 
-  // Boot: ALWAYS show the login window and keep it up until sign-in succeeds.
-  // (No silent auto-login — the user asked to log in every time.)
-  token = '';
-  showAuth(true);
-  setNet('', 'signed out');
+  // Pre-warm the hosted server on launch so it's awake by the time the user
+  // logs in (free tier sleeps after ~15 min idle; cold start ~30-50s).
+  if (window.SERVER_BASE) { try { fetch(window.SERVER_BASE + '/app.html', { method: 'HEAD', mode: 'no-cors' }).catch(() => {}); } catch (e) {} }
+
+  // ---- Boot ------------------------------------------------------------------
+  // First time (no saved login): FULL login, username+password required, cannot
+  // be bypassed. Returning user (saved token): connect in the background and show
+  // the LIGHT prompt (code only, Cancel to just use the app).
+  if (token) {
+    setNet('wait', 'connecting…');
+    connectWS();          // uses the saved token; if it's rejected we fall to full login
+    showAuth('light');
+  } else {
+    showAuth('full');
+    setNet('', 'signed out');
+  }
 })();

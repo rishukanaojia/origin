@@ -83,9 +83,13 @@
   .screen:fullscreen { border:none; border-radius:0; }
   .screen:fullscreen video { width:100%; height:100%; object-fit:contain; }
   #kb { position:absolute; bottom:0; left:0; width:1px; height:1px; opacity:0; border:none; padding:0; font-size:16px; }
-  #fsKb { display:none; position:absolute; top:14px; right:14px; z-index:2; opacity:.8; font-size:18px; padding:9px 13px;
-          background:rgba(10,18,28,.8); color:var(--ink); border:1px solid var(--stroke); }
+  #fsKb { display:none; position:absolute; top:14px; right:14px; z-index:2; opacity:.85; font-size:18px; padding:9px 13px;
+          background:rgba(10,18,28,.85); color:var(--ink); border:1px solid var(--stroke); }
   .screen:fullscreen #fsKb { display:block; }
+  /* Exit-fullscreen button — only visible in fullscreen, top-left corner. */
+  #fsExit { display:none; position:absolute; top:14px; left:14px; z-index:3; opacity:.9; font-size:14px; font-weight:700;
+            padding:9px 14px; background:linear-gradient(135deg,#ff7a7a,#e0554e); color:#2a0808; border:none; }
+  .screen:fullscreen #fsExit { display:block; }
   .overlay { position:absolute; inset:0; display:grid; place-items:center; text-align:center; padding:24px;
              color:#9fb2c4; font-size:15px; background:radial-gradient(circle at center, rgba(20,30,44,.4), rgba(7,11,18,.85)); }
   #log { font-family:'JetBrains Mono',ui-monospace,monospace; font-size:11px; color:#8fb4c9; margin-top:14px;
@@ -191,7 +195,6 @@
     <div class="toolbar">
       <span class="who" id="roleText">—</span>
       <span class="spacer"></span>
-      <button class="ghost" id="swapBtn" title="Swap who shares and who controls">⇄ Swap roles</button>
       <button class="ghost" id="kbBtn" disabled title="On-screen keyboard">⌨ Keyboard</button>
       <button class="ghost" id="fsBtn" disabled title="Full screen">⛶ Full screen</button>
       <button class="danger" id="hangupBtn">✕ Disconnect</button>
@@ -203,7 +206,7 @@
       <button class="key mod" data-code="ControlLeft">Ctrl</button>
       <button class="key mod" data-code="ShiftLeft">Shift</button>
       <button class="key mod" data-code="AltLeft">Alt</button>
-      <button class="key mod" data-code="MetaLeft">Win</button>
+      <button class="key" data-tapcode="MetaLeft" title="Windows / Super key (Start menu)">⊞ Win</button>
       <span style="width:8px"></span>
       <button class="key" data-tap="Escape">Esc</button>
       <button class="key" data-tap="Tab">Tab</button>
@@ -217,6 +220,7 @@
       <video id="remote" playsinline autoplay tabindex="0"></video>
       <video id="preview" playsinline autoplay muted style="display:none;"></video>
       <div class="overlay" id="overlay">Connecting…</div>
+      <button id="fsExit" title="Exit full screen">✕ Exit</button>
       <button id="fsKb" title="On-screen keyboard">⌨</button>
       <input id="kb" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
     </div>
@@ -243,21 +247,31 @@
       <div class="logo" style="width:40px;height:40px;font-size:20px;">🔐</div>
       <div>
         <h3 style="margin:0;">RemoteLink</h3>
-        <p style="margin:0;font-size:12px;">Sign in to continue</p>
+        <p id="authTitle" style="margin:0;font-size:12px;">Sign in to continue</p>
       </div>
     </div>
-    <label for="aUser">Username</label>
-    <input id="aUser" autocomplete="username" placeholder="user001" style="letter-spacing:.04em;font-size:16px;">
-    <label for="aPw">Password</label>
-    <input id="aPw" type="password" autocomplete="current-password" placeholder="••••••••" style="letter-spacing:.04em;font-size:16px;">
-    <label for="aCode" style="margin-top:12px;">Connect code <span style="text-transform:none;letter-spacing:0;">(paste the code from the other device — fills everything)</span></label>
+
+    <!-- Username/password + server — only shown the FIRST time (no saved login). -->
+    <div id="credRows">
+      <label for="aUser">Username</label>
+      <input id="aUser" autocomplete="username" placeholder="user001" style="letter-spacing:.04em;font-size:16px;">
+      <label for="aPw">Password</label>
+      <input id="aPw" type="password" autocomplete="current-password" placeholder="••••••••" style="letter-spacing:.04em;font-size:16px;">
+      <label for="aServer" style="margin-top:12px;">Server <span style="text-transform:none;letter-spacing:0;">(optional)</span></label>
+      <input id="aServer" placeholder="https://your-server.onrender.com" autocomplete="off" style="letter-spacing:0;font-size:14px;">
+    </div>
+
+    <!-- Connect code — shown in both modes. -->
+    <label for="aCode" style="margin-top:12px;">Connect code <span style="text-transform:none;letter-spacing:0;">(paste to connect to a device)</span></label>
     <div class="row">
       <input id="aCode" placeholder="paste connect code…" autocomplete="off" style="letter-spacing:0;font-size:14px;">
       <button class="ghost" id="applyCode" title="Apply code" style="padding:12px 14px;">Use</button>
     </div>
-    <label for="aServer" style="margin-top:12px;">Server <span style="text-transform:none;letter-spacing:0;">(or set the URL manually)</span></label>
-    <input id="aServer" placeholder="https://your-server.onrender.com" autocomplete="off" style="letter-spacing:0;font-size:14px;">
-    <button id="loginBtn" style="width:100%;margin-top:20px;">Sign in</button>
+
+    <div class="row" style="margin-top:20px;">
+      <button id="loginBtn" style="flex:1;">Sign in</button>
+      <button id="cancelBtn" class="ghost" style="flex:1;display:none;">Cancel</button>
+    </div>
     <p class="note" id="authNote"></p>
   </div>
 </div>
